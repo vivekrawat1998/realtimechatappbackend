@@ -3,7 +3,7 @@ const userModel = require('./Models/Usermodal');
 const messageModel = require('./Models/Message');
 
 let io;
-const onlineUsers = new Map(); // Add this to track online users
+const onlineUsers = new Map(); 
 
 function initializeSocket(server) {
     io = socketIo(server, {
@@ -16,29 +16,24 @@ function initializeSocket(server) {
     io.on('connection', (socket) => {
         console.log(`Client connected: ${socket.id}`);
 
-        // Handle user joining
         socket.on('join', async (data) => {
             const { userId } = data;
             
             try {
-                // Find user from database to get full user details
                 const user = await userModel.findById(userId);
                 if (user) {
-                    // Store user's online status with full details
                     onlineUsers.set(userId, {
                         socketId: socket.id,
                         userId: userId,
-                        username: user.fullname, // Use fullname from database
+                        username: user.fullname, 
                         email: user.email
                     });
 
-                    // Update user's socket ID in database
                     await userModel.findByIdAndUpdate(userId, { 
                         socketId: socket.id,
                         isOnline: true 
                     });
 
-                    // Broadcast updated online users list
                     const onlineUsersList = Array.from(onlineUsers.values());
                     io.emit('onlineUsers', onlineUsersList);
                 }
@@ -47,13 +42,10 @@ function initializeSocket(server) {
             }
         });
 
-        // Handle disconnection
         socket.on('disconnect', async () => {
-            // Find user by socket ID
             for (const [userId, userData] of onlineUsers.entries()) {
                 if (userData.socketId === socket.id) {
                     onlineUsers.delete(userId);
-                    // Update user's online status in database
                     await userModel.findByIdAndUpdate(userId, { 
                         isOnline: false,
                         lastSeen: new Date()
@@ -61,7 +53,6 @@ function initializeSocket(server) {
                     break;
                 }
             }
-            // Broadcast updated online users list
             const onlineUsersList = Array.from(onlineUsers.values());
             io.emit('onlineUsers', onlineUsersList);
         });
@@ -71,21 +62,18 @@ function initializeSocket(server) {
             const { senderId, receiverId, content, media } = messageData;
             
             try {
-                // Create the message
                 const newMessage = await messageModel.create({
                     sender: senderId,
                     receiver: receiverId,
                     content,
                     media,
-                    status: 'Sent',  // Add initial status
-                    readAt: null     // Add read timestamp
+                    status: 'Sent',  
+                    readAt: null    
                 });
 
-                // Find receiver's socket ID
                 const receiverUser = await userModel.findById(receiverId);
                 const senderUser = await userModel.findById(senderId);
                 
-                // Send to receiver if online
                 if (receiverUser && receiverUser.socketId) {
                     io.to(receiverUser.socketId).emit('receive-message', {
                         message: {
@@ -98,7 +86,6 @@ function initializeSocket(server) {
                     });
                 }
 
-                // Send confirmation to sender
                 socket.emit('message-sent', {
                     success: true,
                     messageId: newMessage._id
@@ -110,7 +97,6 @@ function initializeSocket(server) {
             }
         });
 
-        // Add new event for fetching reply thread
         socket.on('fetch-reply-thread', async ({ messageId }) => {
             try {
                 const message = await messageModel.findById(messageId)
@@ -139,7 +125,6 @@ function initializeSocket(server) {
                     { new: true }
                 );
                 
-                // Notify sender that message was read
                 const senderSocket = onlineUsers.get(message.sender.toString());
                 if (senderSocket) {
                     io.to(senderSocket.socketId).emit('message-status-update', {
@@ -157,35 +142,31 @@ function initializeSocket(server) {
             const { content, to, from, media } = messageData;
             
             try {
-                // Create new message in database
                 const newMessage = await messageModel.create({
                     sender: from,
                     receiver: to,
                     content: content,
-                    media: media, // Add media field
+                    media: media, 
                     timestamp: new Date()
                 });
 
-                // Get receiver's socket id from onlineUsers
                 const receiverSocketData = onlineUsers.get(to);
                 
                 if (receiverSocketData) {
-                    // Send to receiver
                     io.to(receiverSocketData.socketId).emit('receiveMessage', {
                         content,
                         from,
                         to,
-                        media, // Include media in the emitted message
+                        media, 
                         messageId: newMessage._id,
                         timestamp: newMessage.timestamp
                     });
                 }
 
-                // Send back to sender for confirmation
                 socket.emit('messageSent', {
                     content,
                     to,
-                    media, // Include media in the confirmation
+                    media, 
                     messageId: newMessage._id,
                     timestamp: newMessage.timestamp
                 });

@@ -5,10 +5,16 @@ const app = express();
 const cookieparser = require('cookie-parser');
 const uploadRouter = require("./routes/uploadRoutes")
 const userRouter = require("./routes/user.route")
-
-const cors = require('cors');
 const connectDB = require('./db/db'); 
-app.use(cors());
+const cors = require('cors');
+
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true  // Allow cookies if needed
+}));
+
 
 app.use(cookieparser());
 connectDB();
@@ -16,12 +22,11 @@ connectDB();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/users', userRouter);
+app.use('/user', userRouter);
 app.use('/uploads', uploadRouter);
 
 app.get('/', (req, res) => {
     res.send('Hello World');
 });
-
 
 module.exports = app;
